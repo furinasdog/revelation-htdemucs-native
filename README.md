@@ -58,4 +58,12 @@ python tests/compare_official.py mix.wav 955717e8-8726e21a.th comparison --nativ
 
 在 Windows x64 CPU 上，以两段 13.17 秒和 14.29 秒的立体声音乐做过对照。两段的四轨各自都与官方模型输出等长，两声道的互相关峰值均在 0 采样偏移。后一段包含较清楚的鼓、贝斯和人声，逐轨逐声道的信噪比为 53.4–83.9 dB。可用 Python 3.11 或更高版本复测，`*-AB.wav` 依次播放官方和原生输出，中间留有短暂停顿。
 
+同一段 14.29 秒音乐使用 Revelation CUDA 附加包复测，四轨两声道仍为 0 采样偏移，逐轨逐声道信噪比为 50.4–75.4 dB。
+
+Windows 长路径回归会将本地模型与 FFmpeg 放在超过 320 个字符的中文目录，用真实推理检查四轨、进度与临时目录的清理。此项只需 Python 标准库。
+
+```powershell
+python tests/windows_long_paths.py dist/revelation-stems.exe htdemucs_fp16weights.onnx C:/tools/ffmpeg.exe
+```
+
 本项目代码采用 GPL-3.0-only。模型、推理库及外部解码器的来源和条款见[第三方声明](THIRD_PARTY.md)。

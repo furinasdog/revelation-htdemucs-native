@@ -9,6 +9,22 @@
 
 namespace fs = std::filesystem;
 
+namespace {
+fs::path native_path(fs::path path) {
+    path.make_preferred();
+    const auto& name = path.native();
+    if (path.empty() || name.rfind(LR"(\\?\)", 0) == 0 || name.rfind(LR"(\\.\)", 0) == 0)
+        return path;
+    // Verbatim Windows paths must be absolute and have no "." or ".." components.
+    if (path.is_relative() && !path.has_root_name())
+        path = fs::current_path() / path;
+    const auto absolute = fs::absolute(path).lexically_normal().make_preferred().wstring();
+    if (absolute.rfind(LR"(\\)", 0) == 0)
+        return LR"(\\?\UNC\)" + absolute.substr(2);
+    return LR"(\\?\)" + absolute;
+}
+}
+
 int wmain(int argc, wchar_t** argv) {
     constexpr char usage[] = "Usage: revelation-stems --input AUDIO --model HTDEMUCS.onnx --output NEW_DIRECTORY [--ffmpeg PATH] [--progress FILE]";
     if (argc == 2 && std::wstring(argv[1]) == L"--help") {
@@ -26,10 +42,10 @@ int wmain(int argc, wchar_t** argv) {
         }
         if (args[L"--input"].empty() || args[L"--model"].empty() || args[L"--output"].empty())
             throw std::invalid_argument(usage);
-        const fs::path audio = fs::absolute(args[L"--input"]);
-        const fs::path model = fs::absolute(args[L"--model"]);
-        const fs::path output = fs::absolute(args[L"--output"]);
-        const fs::path progress = args[L"--progress"];
+        const auto audio = native_path(args[L"--input"]);
+        const auto model = native_path(args[L"--model"]);
+        const auto output = native_path(args[L"--output"]);
+        const auto progress = native_path(args[L"--progress"]);
         if (!fs::is_regular_file(audio) || !fs::is_regular_file(model))
             throw std::runtime_error("Input audio and model must be readable local files");
         if (fs::exists(output)) throw std::runtime_error("Output directory already exists");
@@ -41,7 +57,10 @@ int wmain(int argc, wchar_t** argv) {
         if (!fs::create_directory(temp)) throw std::runtime_error("Cannot create a private staging directory");
         struct Cleanup { fs::path dir; ~Cleanup() { std::error_code ec; fs::remove_all(dir, ec); } } cleanup{temp};
         const auto pcm = temp / "mixture.f32";
-        stems::decode(args[L"--ffmpeg"].empty() ? fs::path(L"ffmpeg.exe") : args[L"--ffmpeg"], audio, pcm);
+        fs::path ffmpeg = args[L"--ffmpeg"];
+        if (ffmpeg.empty()) ffmpeg = L"ffmpeg.exe";
+        if (ffmpeg.has_parent_path()) ffmpeg = native_path(ffmpeg);
+        stems::decode(ffmpeg, audio, pcm);
         const auto staging = temp / "stems";
         fs::create_directory(staging);
         stems::separate(pcm, model, staging, progress);

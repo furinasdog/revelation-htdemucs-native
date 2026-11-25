@@ -54,7 +54,10 @@ void stems::decode(const std::filesystem::path& ffmpeg, const std::filesystem::p
     startup.StartupInfo.cb = sizeof(startup);
     startup.lpAttributeList = list;
     PROCESS_INFORMATION child{};
-    check(CreateProcessW(nullptr, command.data(), nullptr, nullptr, FALSE,
+    // The executable token inside the command line is limited to MAX_PATH when
+    // lpApplicationName is null. Keep PATH lookup only for an unqualified name.
+    const wchar_t* executable = ffmpeg.has_parent_path() ? ffmpeg.c_str() : nullptr;
+    check(CreateProcessW(executable, command.data(), nullptr, nullptr, FALSE,
                          CREATE_NO_WINDOW | EXTENDED_STARTUPINFO_PRESENT, nullptr, nullptr, &startup.StartupInfo, &child),
           "start FFmpeg");
     Handle process(child.hProcess), thread(child.hThread);
