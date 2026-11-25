@@ -1,0 +1,10 @@
+/build/
+/out/
+/dist/
+/work/
+/comparison/
+/models/
+*.onnx
+*.th
+*.part
+__pycache__/
